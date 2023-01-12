@@ -41,16 +41,15 @@ class DremioClientAuthMiddleware(flight.ClientMiddleware):
  
  
 class DremioClientAuthMiddlewareFactory(flight.ClientMiddlewareFactory):
-  """A factory that creates DremioClientAuthMiddleware(s)."""
+    
+    def __init__(self):
+        self.call_credential = []
  
-  def __init__(self):
-    self.call_credential = []
+    def start_call(self, info) -> DremioClientAuthMiddleware:
+        return DremioClientAuthMiddleware(self)
  
-  def start_call(self, info) -> DremioClientAuthMiddleware:
-    return DremioClientAuthMiddleware(self)
- 
-  def set_call_credential(self, call_credential) -> None:
-    self.call_credential = call_credential
+    def set_call_credential(self, call_credential) -> None:
+        self.call_credential = call_credential
  
  
 @dataclass           
@@ -67,7 +66,7 @@ class DremioFlightConnection:
     # If routing tag is not assigned to any queue, request will be
     # sent to the default dremio queue
     default_dremio_routing_tag: str = b"lid-toolbox-default-tag"
-    # Routing queue has to exist. Default: Dremio chooses
+ # type: ignore    # Routing queue has to exist. Default: Dremio chooses
     # self.default_dremio_routing_queue = b"High Cost User Queries"
  
     def __post_init__(self) -> None:
@@ -236,3 +235,8 @@ class DremioFlightConnection:
                 return reader.read_all()
          
         return execute_query()
+
+
+username = "UI758624"
+token = "LiCw3ErlR6e4ABCqxEjpec+ganUkZY7YGat8Q+qo+0xgBH4f6tfhkLqfvdLVoA==" # Could also be PW, but not recommended. You can also get these from a secret/file you configure yourself.
+client = DremioFlightConnection(username, token)
