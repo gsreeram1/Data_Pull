@@ -77,7 +77,7 @@ class ACDB:
         def get_ERCOT_load_actuals(self):
         
         
-                query = """select FCID, StartTime, Value from ERCOT_Forecasts
+                query = """select FCID, Convert(datetime,Cast(StartTime As datetime),108) As date, Value from ERCOT_Forecasts
                 WHERE FCID IN (110,111,112,113,114,115,116,117,119,120,121,122,123)"""
 
                 df = pd.read_sql_query(query,self.engine)
@@ -88,7 +88,7 @@ class ACDB:
         
         def get_ERCOT_load_forecasts(self):
         
-                query = """select FCID, StartTime, Value from ERCOT_Forecasts WHERE FCID IN (9,10,11,12,13,14,15,16,17,18,19,20,21)"""
+                query = """select FCID, Convert(datetime,Cast(ERCOT_Forecasts.StartTime As datetime),108) As StartTime, Value from ERCOT_Forecasts WHERE FCID IN (9,10,11,12,13,14,15,16,17,18,19,20,21)"""
         
                 df = pd.read_sql_query(query,self.engine)
         
@@ -98,7 +98,7 @@ class ACDB:
 
         def get_DAM_hub_spp(self):
 
-                query = """select ERCOT_Prices.PCID,ERCOT_Prices.Value,ERCOT_Prices.StartTime,ERCOT_PriceCurves.SettlementPointName,ERCOT_PriceCurves.Interval  
+                query = """select ERCOT_Prices.PCID,ERCOT_Prices.Value,Convert(datetime,Cast(ERCOT_Prices.StartTime As datetime),108) As StartTime,ERCOT_PriceCurves.SettlementPointName,ERCOT_PriceCurves.Interval  
                 from ERCOT_Prices 
                 LEFT OUTER JOIN 
                 ERCOT_PriceCurves on ERCOT_Prices.PCID = ERCOT_PriceCurves.PCID where ERCOT_PriceCurves.Interval = 60 and ERCOT_PriceCurves.MarketType = 'DAM' and SettlementPointName LIKE 'HB_%'
@@ -110,7 +110,7 @@ class ACDB:
 
         def get_RT_hub_spp(self):
 
-                query = """select ERCOT_Prices.PCID,ERCOT_Prices.Value,ERCOT_Prices.StartTime,ERCOT_PriceCurves.SettlementPointName,ERCOT_PriceCurves.Interval  
+                query = """select ERCOT_Prices.PCID,ERCOT_Prices.Value,Convert(datetime,Cast(ERCOT_Prices.StartTime As datetime),108) As StartTime,ERCOT_PriceCurves.SettlementPointName,ERCOT_PriceCurves.Interval  
                 from ERCOT_Prices 
                 LEFT OUTER JOIN 
                 ERCOT_PriceCurves on ERCOT_Prices.PCID = ERCOT_PriceCurves.PCID where ERCOT_PriceCurves.Interval = 15 and ERCOT_PriceCurves.MarketType = 'RTM' and SettlementPointName LIKE 'HB_%'
@@ -122,7 +122,7 @@ class ACDB:
 
         def get_intermittent_forecast(self):
 
-                query = """SELECT ERCOT_Forecasts.FCID, ERCOT_Forecasts.StartTime, ERCOT_Forecasts.Value, ERCOT_ForecastCurves.Type
+                query = """SELECT ERCOT_Forecasts.FCID, Convert(datetime,Cast(ERCOT_Forecasts.StartTime As datetime),108) As StartTime, ERCOT_Forecasts.Value, ERCOT_ForecastCurves.Type
                 from ERCOT_Forecasts
                 left outer join
                 ERCOT_ForecastCurves
@@ -139,7 +139,7 @@ class ACDB:
 
         def get_intermittent_actuals(self):
 
-                query = """SELECT ERCOT_Forecasts.FCID, ERCOT_Forecasts.StartTime, ERCOT_Forecasts.Value, ERCOT_ForecastCurves.Type
+                query = """SELECT ERCOT_Forecasts.FCID,Convert(datetime,Cast(ERCOT_Forecasts.StartTime As datetime),108) As StartTime, ERCOT_Forecasts.Value, ERCOT_ForecastCurves.Type
                 from ERCOT_Forecasts
                 left outer join
                 ERCOT_ForecastCurves
@@ -158,7 +158,7 @@ class ACDB:
         
         def get_temp_forecasts(self):
 
-                query = """SELECT ERCOT_Forecasts.FCID, ERCOT_Forecasts.StartTime, ERCOT_Forecasts.Value, ERCOT_ForecastCurves.Type
+                query = """SELECT ERCOT_Forecasts.FCID, Convert(datetime,Cast(ERCOT_Forecasts.StartTime As datetime),108) As StartTime, ERCOT_Forecasts.Value, ERCOT_ForecastCurves.Type
                 from ERCOT_Forecasts
                 left outer join
                 ERCOT_ForecastCurves
