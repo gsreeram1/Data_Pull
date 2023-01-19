@@ -207,7 +207,7 @@ class ACDB:
                                 )
 
 
-                        ) As tblhenryhub) tblfinal --Where tblfinal.Strip > '7/1/2024'
+                        ) As tblhenryhub) tblfinal 
                         Order By CurveSource, Market, Product, Hub, Commodity, Strip, Contract, Lbl"""
 
                 df = pd.read_sql_query(query,self.engine)
