@@ -174,14 +174,134 @@ class ACDB:
         
                 return df
 
+
+        def get_NGLD1_prices(self):
+
+                query= """"Select *
+                        From (
+                        Select 'ICE-NGX' As CurveSource, 'HENRYHUB' As Market, Lbl, CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+                        From (
+                                (Select 'Current' As Lbl, CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product From
+                                        (Select CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+                                        From
+                                        (Select fp.CurveID, fp.TradeDate, fp.SettlementPrice, f.Strip, f.ExpirationDate, f.Hub, f.Commodity, f.Contract, f.ContractType, f.Exchange, f.Product
+                                        From assetcommercialus.dbo.ICE_ForwardPrices fp
+                                        Left Join 
+                                                (Select CurveID, Strip, ExpirationDate, iceh.Hub, icecom.Commodity, icecon.Contract, icecont.ContractType, iceex.Exchange, iceproduct.Product
+                                                From assetcommercialus.dbo.ICE_Forwards icef
+                                                Left Join assetcommercialus.dbo.ICE_Hub iceh On iceh.ID = icef.Hub
+                                                Left Join assetcommercialus.dbo.ICE_Commodity icecom On icecom.ID = icef.Commodity
+                                                Left Join assetcommercialus.dbo.ICE_Contract icecon On icecon.ID = icef.Contract
+                                                Left Join assetcommercialus.dbo.ICE_ContractType icecont On icecont.ID = icef.ContractType
+                                                Left Join assetcommercialus.dbo.ICE_Exchange iceex On iceex.ID = icef.Exchange
+                                                Left Join assetcommercialus.dbo.ICE_Imports iceimp On (iceimp.Commodity = icecom.Commodity And iceimp.Contract = icecon.Contract And iceimp.Exchange = iceex.Exchange)
+                                                Left Join assetcommercialus.dbo.ICE_Product iceproduct On iceproduct.ID = icef.Product
+                                                ) f
+                                        On f.CurveID = fp.CurveID
+                                        ) As fp2
+
+                                        Where fp2.TradeDate > '2017-01-01'
+                                        And fp2.Product = 'NG LD1 Futures'
+                                        And fp2.Hub = 'Henry'
+                                        ) As tblh
+                                )
+
+
+                        ) As tblhenryhub) tblfinal --Where tblfinal.Strip > '7/1/2024'
+                        Order By CurveSource, Market, Product, Hub, Commodity, Strip, Contract, Lbl"""
+
+                df = pd.read_sql_query(query,self.engine)
+
+                return df
+
+
+        def get_North_HR(self):
+
+                query = """	(Select 'Current' As Lbl, * From
+		(Select CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+		From
+		(Select fp.CurveID, fp.TradeDate, fp.SettlementPrice, f.Strip, f.ExpirationDate, f.Hub, f.Commodity, f.Contract, f.ContractType, f.Exchange, f.Product
+		From assetcommercialus.dbo.ICE_ForwardPrices fp
+		Left Join 
+			(Select CurveID, Strip, ExpirationDate, iceh.Hub, icecom.Commodity, icecon.Contract, icecont.ContractType, iceex.Exchange, iceproduct.Product
+			From assetcommercialus.dbo.ICE_Forwards icef
+			Left Join assetcommercialus.dbo.ICE_Hub iceh On iceh.ID = icef.Hub
+			Left Join assetcommercialus.dbo.ICE_Commodity icecom On icecom.ID = icef.Commodity
+			Left Join assetcommercialus.dbo.ICE_Contract icecon On icecon.ID = icef.Contract
+			Left Join assetcommercialus.dbo.ICE_ContractType icecont On icecont.ID = icef.ContractType
+			Left Join assetcommercialus.dbo.ICE_Exchange iceex On iceex.ID = icef.Exchange
+			Left Join assetcommercialus.dbo.ICE_Imports iceimp On (iceimp.Commodity = icecom.Commodity And iceimp.Contract = icecon.Contract And iceimp.Exchange = iceex.Exchange)
+			Left Join assetcommercialus.dbo.ICE_Product iceproduct On iceproduct.ID = icef.Product
+			) f
+		On f.CurveID = fp.CurveID
+		) As fp2
+
+		Where fp2.TradeDate > '2017-01-01'
+		And (fp2.Contract = 'YGV' Or fp2.Contract = 'XPR' Or fp2.Contract = 'XPS' Or fp2.Contract = 'XPT' Or fp2.Contract = 'XPU' Or fp2.Contract = 'XRW') --just HR values for ERCOT North
+		) As tblHRercotnorth)"""
+
+                df = pd.read_sql_query(query,self.engine)
+
+                return df
+
+        def get_West_HR(self):
+
+                query = """	(Select 'Current' As Lbl, * From
+		(Select CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+		From
+		(Select fp.CurveID, fp.TradeDate, fp.SettlementPrice, f.Strip, f.ExpirationDate, f.Hub, f.Commodity, f.Contract, f.ContractType, f.Exchange, f.Product
+		From assetcommercialus.dbo.ICE_ForwardPrices fp
+		Left Join 
+			(Select CurveID, Strip, ExpirationDate, iceh.Hub, icecom.Commodity, icecon.Contract, icecont.ContractType, iceex.Exchange, iceproduct.Product
+			From assetcommercialus.dbo.ICE_Forwards icef
+			Left Join assetcommercialus.dbo.ICE_Hub iceh On iceh.ID = icef.Hub
+			Left Join assetcommercialus.dbo.ICE_Commodity icecom On icecom.ID = icef.Commodity
+			Left Join assetcommercialus.dbo.ICE_Contract icecon On icecon.ID = icef.Contract
+			Left Join assetcommercialus.dbo.ICE_ContractType icecont On icecont.ID = icef.ContractType
+			Left Join assetcommercialus.dbo.ICE_Exchange iceex On iceex.ID = icef.Exchange
+			Left Join assetcommercialus.dbo.ICE_Imports iceimp On (iceimp.Commodity = icecom.Commodity And iceimp.Contract = icecon.Contract And iceimp.Exchange = iceex.Exchange)
+			Left Join assetcommercialus.dbo.ICE_Product iceproduct On iceproduct.ID = icef.Product
+			) f
+		On f.CurveID = fp.CurveID
+		) As fp2
+
+		Where fp2.TradeDate > '2017-01-01'
+		And (fp2.Contract = 'YGY' Or fp2.Contract = 'XQH' Or fp2.Contract = 'XQJ' Or fp2.Contract = 'XQK' Or fp2.Contract = 'XQI' Or fp2.Contract = 'XS9') --just HR values for ERCOT West
+		) As tblHRercotwest)"""
+
+                df = pd.read_sql_query(query, self.engine)
+
+                return df
+
         
+        def get_ICE_North_Prices(self):
 
-                        
+                query = """Select 'ICE-NGX' As CurveSource, 'ERCOT' As Market, Lbl, CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+                        From (
+                        (Select 'Current' As Lbl, * From
+                                (Select CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+                                From
+                                (Select fp.CurveID, fp.TradeDate, fp.SettlementPrice, f.Strip, f.ExpirationDate, f.Hub, f.Commodity, f.Contract, f.ContractType, f.Exchange, f.Product
+                                From assetcommercialus.dbo.ICE_ForwardPrices fp
+                                Left Join 
+                                        (Select CurveID, Strip, ExpirationDate, iceh.Hub, icecom.Commodity, icecon.Contract, icecont.ContractType, iceex.Exchange, iceproduct.Product
+                                        From assetcommercialus.dbo.ICE_Forwards icef
+                                        Left Join assetcommercialus.dbo.ICE_Hub iceh On iceh.ID = icef.Hub
+                                        Left Join assetcommercialus.dbo.ICE_Commodity icecom On icecom.ID = icef.Commodity
+                                        Left Join assetcommercialus.dbo.ICE_Contract icecon On icecon.ID = icef.Contract
+                                        Left Join assetcommercialus.dbo.ICE_ContractType icecont On icecont.ID = icef.ContractType
+                                        Left Join assetcommercialus.dbo.ICE_Exchange iceex On iceex.ID = icef.Exchange
+                                        Left Join assetcommercialus.dbo.ICE_Imports iceimp On (iceimp.Commodity = icecom.Commodity And iceimp.Contract = icecon.Contract And iceimp.Exchange = iceex.Exchange)
+                                        Left Join assetcommercialus.dbo.ICE_Product iceproduct On iceproduct.ID = icef.Product
+                                        ) f
+                                On f.CurveID = fp.CurveID
+                                ) As fp2
+                                Where fp2.TradeDate > '2017-01-01'
+                                And (fp2.Contract = 'YFO' Or fp2.Contract = 'XRT' Or fp2.Contract = 'XPA' Or fp2.Contract = 'XPB' Or fp2.Contract = 'XPC' Or fp2.Contract = 'XPD') --just phys power price for ERCOT North
+                                ) As tblphysercotnorth)) As tblhenryhub"""
 
+                df = pd.read_sql_query(query,self.engine)
 
-
-        
-
-        
+                return df
 
 #print(dremio_data().get_ercot_wind_actuals()['ReferenceDate'].min())
