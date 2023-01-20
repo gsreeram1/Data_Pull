@@ -312,7 +312,7 @@ class ACDB:
                         On f.CurveID = fp.CurveID
                         ) As fp2
                         Where fp2.TradeDate > '2017-01-01'
-                        And (fp2.Contract = 'YFO' Or fp2.Contract = 'XRT' Or fp2.Contract = 'XPA' Or fp2.Contract = 'XPB' Or fp2.Contract = 'XPC' Or fp2.Contract = 'XPD') 
+                        And (fp2.Contract = 'END') 
                         ) As tblphysercotnorth)) As tblhenryhub"""
 
                 df = pd.read_sql_query(query,self.engine)
@@ -320,5 +320,33 @@ class ACDB:
                 df = df.convert_dtypes()
 
                 return df
+
+        def get_total_outages(self):
+
+                query = """(Select Dateadd(Hour,HourEnding-1,Convert(datetime,Cast(Date As datetime),108)) As date
+                        , HourEnding As HE
+                        , TotalResourceMWZoneSouth+TotalResourceMWZoneNorth+TotalResourceMWZoneWest+TotalResourceMWZoneHouston As TotResourceCapOut
+                        , TotalIRRMWZoneSouth+TotalIRRMWZoneNorth+TotalIRRMWZoneWest+TotalIRRMWZoneHouston As TotRenewResourceCapOut
+                        , TotalNewEquipResourceMWZoneSouth+TotalNewEquipResourceMWZoneNorth+TotalNewEquipResourceMWZoneWest+TotalNewEquipResourceMWZoneHouston As TotNewEquipResourceCapOut
+                        , TotalResourceMWZoneHouston As TotResCapOutHouston
+                        , TotalResourceMWZoneNorth As TotResCapOutNorth
+                        , TotalResourceMWZoneSouth As TotResCapOutSouth
+                        , TotalResourceMWZoneWest As TotResCapOutWest
+                        , TotalIRRMWZoneHouston As TotRenewResourceCapOutHouston
+                        , TotalIRRMWZoneNorth As TotRenewResourceCapOutNorth
+                        , TotalIRRMWZoneSouth As TotRenewResourceCapOutSouth
+                        , TotalIRRMWZoneWest As TotRenewResourceCapOutWest
+                        , TotalNewEquipResourceMWZoneHouston As TotNEquipCapOutHouston
+                        , TotalNewEquipResourceMWZoneNorth As TotNEquipCapOutNorth
+                        , TotalNewEquipResourceMWZoneSouth As TotNEquipCapOutSouth
+                        , TotalNewEquipResourceMWZoneWest As TotNEquipCapOutWest
+                        From assetcommercialus.dbo.ERCOT_ResourceOutageCapacity)"""
+                
+                df = pd.read_sql_query(query,self.engine)
+
+                df = df.convert_dtypes()
+
+                return df
+                
 
 #print(dremio_data().get_ercot_wind_actuals()['ReferenceDate'].min())
