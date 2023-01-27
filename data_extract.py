@@ -5,6 +5,9 @@ import pandas as pd
 import dremio_caller as dc
 import datetime as dt
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
 
 
 class dremio_data:
@@ -105,6 +108,27 @@ class ACDB:
         
                 return df
 
+        def get_load_data(self): #Merger of Actual and Forecast
+
+                actual = ACDB().get_ERCOT_load_actuals()[['StartTime', 'NORTH','HOUSTON','WEST','FAR_WEST','SOUTH','TOTAL']]
+                
+                actual = actual.rename(columns = {'NORTH':'north_actual','HOUSTON':'houston_actual','WEST':'west_actual','FAR_WEST':'far_west_actual','SOUTH':'south_actual','TOTAL':'total_actual'})
+
+                forecast = ACDB().get_ERCOT_load_forecasts()[['StartTime', 'North','Houston','West','FarWest','South','System']]
+
+                forecast = forecast.rename(columns = {'North':'north_forc','Houston':'houston_forc','West':'west_forc','FarWest':'far_west_forc','South':'south_forc','System':'total_forc'})
+
+                df = actual.merge(forecast, left_on ='StartTime',right_on = "StartTime")
+
+                df['north_diff'] = df['north_actual'] - df['north_forc']
+                df['south_diff'] = df['south_actual'] - df['south_forc']
+                df['houston_diff'] = df['houston_actual'] - df['houston_forc']
+                df['west_diff'] = df['west_actual'] - df['west_forc']
+                df['far_west_diff'] = df['far_west_actual'] - df['far_west_forc']
+                df['total_diff'] = df['total_actual'] - df['total_forc']
+                
+                return df
+
         def get_DAM_hub_spp(self):
 
                 query = """select ERCOT_Prices.PCID,ERCOT_Prices.Value,Convert(datetime,Cast(ERCOT_Prices.StartTime As datetime),108) As StartTime,ERCOT_PriceCurves.SettlementPointName,ERCOT_PriceCurves.Interval  
@@ -118,6 +142,9 @@ class ACDB:
                 df = df.convert_dtypes()
 
                 df = df.pivot_table('Value','StartTime','SettlementPointName').reset_index()
+
+                df = df[['StartTime','HB_NORTH','HB_WEST','HB_SOUTH','HB_HOUSTON']]
+                df = df.rename(columns = {'HB_NORTH':'north_da','HB_WEST':'west_da','HB_SOUTH':'south_da','HB_HOUSTON':'houston_da'} )
         
                 return df 
 
@@ -136,7 +163,24 @@ class ACDB:
                 df = df.pivot_table('Value','StartTime','SettlementPointName').reset_index()
 
                 df = df.resample('H',on = 'StartTime').mean().reset_index()
+
+                df = df[['StartTime','HB_NORTH','HB_WEST','HB_SOUTH','HB_HOUSTON']]
+                df = df.rename(columns = {'HB_NORTH':'north_rt','HB_WEST':'west_rt','HB_SOUTH':'south_rt','HB_HOUSTON':'houston_rt'} )
         
+                return df
+
+        def get_dart_data(self):
+
+                da = ACDB().get_DAM_hub_spp()
+                rt = ACDB().get_RT_hub_spp()
+
+                df = rt.merge(da,left_on = 'StartTime',right_on = 'StartTime')
+
+                df['north_dart'] = df['north_da'] - df['north_rt']
+                df['west_dart'] = df['west_da'] - df['west_rt']
+                df['south_dart'] = df['south_da'] - df['south_rt']
+                df['houston_dart'] = df['houston_da'] - df['houston_rt']
+
                 return df
 
         def get_intermittent_forecast(self):
@@ -335,7 +379,7 @@ class ACDB:
         
         def get_ICE_North_Prices(self):
 
-                query = """Select 'ICE-NGX' As CurveSource, 'ERCOT' As Market, Lbl, CurveID, TradeDate, CurveID, Convert(datetime,Cast(TradeDate As datetime),108) As TradeDate, Convert(datetime,Cast(Strip As datetime),108) As Strip, Convert(datetime,Cast(ExpirationDate As datetime),108) AS ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+                query = """Select 'ICE-NGX' As CurveSource, 'ERCOT' As Market, Lbl, CurveID, Convert(datetime,Cast(TradeDate As datetime),108) As TradeDate, Convert(datetime,Cast(Strip As datetime),108) As Strip, Convert(datetime,Cast(ExpirationDate As datetime),108) AS ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
                         From (
                         (Select 'Current' As Lbl, * From
                         (Select CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
@@ -356,7 +400,7 @@ class ACDB:
                         On f.CurveID = fp.CurveID
                         ) As fp2
                         Where fp2.TradeDate > '2017-01-01'
-                        And (fp2.Contract = 'END' Or fp2.Contract = 'XRT' Or fp2.Contract = 'XPA' Or fp2.Contract = 'XPB' Or fp2.Contract = 'XPC' Or fp2.Contract = 'XPD') 
+                        And (fp2.Contract = 'END' Or fp2.Contract = 'NED' Or fp2.Contract = 'FSP' Or fp2.Contract = 'TPO' Or fp2.Contract = 'XPC' Or fp2.Contract = 'XPD') 
                         ) As tblphysercotnorth)) As tblhenryhub"""
 
                 df = pd.read_sql_query(query,self.engine)
@@ -364,6 +408,34 @@ class ACDB:
                 df = df.convert_dtypes()
 
                 return df
+
+        def get_ice_north_custom(self,tdelta):
+
+                ice = ACDB().get_ICE_North_Prices()[ACDB().get_ICE_North_Prices()['TradeDate']>'2018-01-01'][['TradeDate','Strip','SettlementPrice','Contract']]
+                wknd_ice = ice
+
+                ice = ice[ice['Contract'] == 'END']
+                wknd_ice = wknd_ice[wknd_ice['Contract'] == 'NED']
+
+                data = pd.DataFrame()
+
+                data['trade_date'] = ice['TradeDate'].unique()
+                data['second_trade_date'] = data['trade_date'].apply(lambda x:x + timedelta(days = tdelta))
+
+                df = data.merge(ice, left_on = ['trade_date','second_trade_date'], right_on = ['Strip','TradeDate'])
+
+                wknd = pd.DataFrame()
+                wknd['trade_date'] = pd.date_range('2018-01-01',pd.to_datetime(datetime.today().strftime("%Y-%m-%d")) - timedelta(days=1), freq = 'd')
+                wknd = wknd[~wknd['trade_date'].isin(data['trade_date'])]
+                wknd['second_trade_date'] = wknd['trade_date'].apply(lambda x:x + timedelta(days = -4))
+                df_wknd = wknd.merge(wknd_ice, left_on = ['trade_date','second_trade_date'], right_on = ['Strip','TradeDate'])
+
+                df_final = pd.concat([df,df_wknd],ignore_index=True)
+
+                df_final = df_final.sort_values(by = 'trade_date')
+
+
+                return df_final
 
         def get_total_outages(self):
 
@@ -391,6 +463,44 @@ class ACDB:
                 df = df.convert_dtypes()
 
                 return df
-                
+
+        def get_term_structure(self,window_1, window_2,days_ahead, contract_name):
+
+                current_date = pd.to_datetime(datetime.today().strftime("%Y-%m-%d")) - timedelta(days=1) #Today-1 
+                yesterday = current_date - timedelta(days=window_1)
+                before_yesterday = yesterday - timedelta(days=window_2)
+                end_date = current_date + timedelta(days=days_ahead)
+
+
+                data = ACDB().get_ICE_North_Prices()[ACDB().get_ICE_North_Prices()['TradeDate'].isin([current_date,yesterday,before_yesterday])][['TradeDate','Strip','SettlementPrice','Contract']]
+                data = data[data['Contract'] == contract_name]
+                current = data[(data['TradeDate'] == current_date)&(data['Strip'].between(current_date,end_date))]
+
+                current_1 = data[(data['TradeDate'] == yesterday)&(data['Strip'].between(current_date,end_date))]
+
+                current_2 = data[(data['TradeDate'] == before_yesterday)&(data['Strip'].between(current_date,end_date))]
+
+
+                fig, ax = plt.subplots()
+
+                ax.plot(current['Strip'],current['SettlementPrice'], label = current_date, marker = ".", color = 'red')
+                ax.plot(current_1['Strip'],current_1['SettlementPrice'], label = yesterday, marker = ".", color = 'violet')
+                ax.plot(current_2['Strip'],current_2['SettlementPrice'], label = before_yesterday, marker = ".", color = 'green')
+
+
+                ax.yaxis.set_major_formatter('${x:1,.0f}')
+
+                ax.yaxis.set_tick_params(which='major', labelcolor='green',
+                                        labelleft=True, labelright=False)
+
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
+
+
+                ax.grid()
+                ax.legend()
+                plt.xticks(rotation=45)
+                return plt.show()
+                                
 
 #print(dremio_data().get_ercot_wind_actuals()['ReferenceDate'].min())
