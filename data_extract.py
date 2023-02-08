@@ -286,6 +286,83 @@ class ACDB:
                 df = df.convert_dtypes()
 
                 data = pd.DataFrame()
+                data_2 = pd.DataFrame()
+                data_3 = pd.DataFrame()
+
+                data['date'] = df['TradeDate'].unique()
+
+                data['strip_date'] = data['date'].apply(lambda x: x.replace(day=1))
+                data['strip_date'] = data['strip_date'].apply(lambda x:x + timedelta(days=32)).apply(lambda x: x.replace(day=1)) #Change time delta to 64 to get 2 months ahead prompt+1
+
+                data_2['date'] = df['TradeDate'].unique()
+
+                data_2['strip_date_2'] = data_2['date'].apply(lambda x: x.replace(day=1))
+                data_2['strip_date_2'] = data_2['strip_date_2'].apply(lambda x:x + timedelta(days=63)).apply(lambda x: x.replace(day=1))               
+
+                data_3['date'] = df['TradeDate'].unique()
+
+                data_3['strip_date_3'] = data_3['date'].apply(lambda x: x.replace(day=1))
+                data_3['strip_date_3'] = data_3['strip_date_3'].apply(lambda x:x + timedelta(days=94)).apply(lambda x: x.replace(day=1))
+
+
+                df_2 = data.merge(df,left_on = ['date','strip_date'], right_on = ['TradeDate','Strip'])
+
+                df_2 = df_2[['date','strip_date','SettlementPrice']]
+
+                df_3 = data_2.merge(df,left_on = ['date','strip_date_2'], right_on = ['TradeDate','Strip'])
+
+                df_3 = df_3[['date','strip_date_2','SettlementPrice']]
+
+                df_3 = df_3.rename(columns={'SettlementPrice':'second_nearest'})
+
+                df_4 = data_3.merge(df,left_on = ['date','strip_date_3'], right_on = ['TradeDate','Strip'])
+
+                df_4 = df_4[['date','strip_date_3','SettlementPrice']]
+
+                df_4 = df_4.rename(columns={'SettlementPrice':'third_nearest'})
+
+                data_merge = df_2.merge(df_3, left_on = 'date', right_on = 'date')
+
+                final_data = data_merge.merge(df_4, left_on = 'date', right_on = 'date')
+
+                return final_data
+
+        def get_natural_gas_prices(self):
+
+                query= """Select *From (Select 'ICE-NGX' As CurveSource, 'HENRYHUB' As Market, Lbl, CurveID, Convert(datetime,Cast(TradeDate As datetime),108) As TradeDate, Convert(datetime,Cast(Strip As datetime),108) As Strip, Convert(datetime,Cast(ExpirationDate As datetime),108) AS ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+                        From (
+                        (Select 'Current' As Lbl, CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product From
+                        (Select CurveID, TradeDate, Strip, ExpirationDate, SettlementPrice, Hub, Commodity, Contract, ContractType, Exchange, Product
+                        From
+                        (Select fp.CurveID, fp.TradeDate, fp.SettlementPrice, f.Strip, f.ExpirationDate, f.Hub, f.Commodity, f.Contract, f.ContractType, f.Exchange, f.Product
+                        From assetcommercialus.dbo.ICE_ForwardPrices fp
+                        Left Join 
+                        (Select CurveID, Strip, ExpirationDate, iceh.Hub, icecom.Commodity, icecon.Contract, icecont.ContractType, iceex.Exchange, iceproduct.Product
+                        From assetcommercialus.dbo.ICE_Forwards icef
+                        Left Join assetcommercialus.dbo.ICE_Hub iceh On iceh.ID = icef.Hub
+                        Left Join assetcommercialus.dbo.ICE_Commodity icecom On icecom.ID = icef.Commodity
+                        Left Join assetcommercialus.dbo.ICE_Contract icecon On icecon.ID = icef.Contract
+                        Left Join assetcommercialus.dbo.ICE_ContractType icecont On icecont.ID = icef.ContractType
+                        Left Join assetcommercialus.dbo.ICE_Exchange iceex On iceex.ID = icef.Exchange
+                        Left Join assetcommercialus.dbo.ICE_Imports iceimp On (iceimp.Commodity = icecom.Commodity And iceimp.Contract = icecon.Contract And iceimp.Exchange = iceex.Exchange)
+                        Left Join assetcommercialus.dbo.ICE_Product iceproduct On iceproduct.ID = icef.Product
+                        ) f
+                        On f.CurveID = fp.CurveID
+                        ) As fp2
+
+                        Where fp2.TradeDate > '2019-01-01'
+                        And fp2.Product = 'NG LD1 Futures'
+                        And fp2.Hub = 'Henry'
+                        ) As tblh
+                        )
+                        ) As tblhenryhub) tblfinal 
+                        Order By CurveSource, Market, Product, Hub, Commodity, Strip, Contract, Lbl"""
+
+                df = pd.read_sql_query(query,self.engine)
+
+                df = df.convert_dtypes()
+
+                data = pd.DataFrame()
 
                 data['date'] = df['TradeDate'].unique()
 
@@ -294,7 +371,7 @@ class ACDB:
 
                 df_2 = data.merge(df,left_on = ['date','strip_date'], right_on = ['TradeDate','Strip'])
 
-                return df_2
+                return df
 
 
         def get_North_HR(self): #Prompt -- XRW is the ATC HR
@@ -427,6 +504,8 @@ class ACDB:
                 wknd = pd.DataFrame()
                 wknd['trade_date'] = pd.date_range('2018-01-01',pd.to_datetime(datetime.today().strftime("%Y-%m-%d")) - timedelta(days=1), freq = 'd')
                 wknd = wknd[~wknd['trade_date'].isin(data['trade_date'])]
+                wknd['day'] = wknd['trade_date'].dt.strftime('%A')
+                wknd = wknd[wknd['day'].isin(['Saturday','Sunday'])]
                 wknd['second_trade_date'] = wknd['trade_date'].apply(lambda x:x + timedelta(days = -4))
                 df_wknd = wknd.merge(wknd_ice, left_on = ['trade_date','second_trade_date'], right_on = ['Strip','TradeDate'])
 
@@ -464,9 +543,9 @@ class ACDB:
 
                 return df
 
-        def get_term_structure(self,window_1, window_2,days_ahead, contract_name):
+        def get_term_structure(self,enter_date,window_1, window_2,days_ahead, contract_name):
 
-                current_date = pd.to_datetime(datetime.today().strftime("%Y-%m-%d")) - timedelta(days=1) #Today-1 
+                current_date = pd.to_datetime(pd.to_datetime(enter_date).strftime("%Y-%m-%d")) - timedelta(days=1)
                 yesterday = current_date - timedelta(days=window_1)
                 before_yesterday = yesterday - timedelta(days=window_2)
                 end_date = current_date + timedelta(days=days_ahead)
@@ -481,7 +560,7 @@ class ACDB:
                 current_2 = data[(data['TradeDate'] == before_yesterday)&(data['Strip'].between(current_date,end_date))]
 
 
-                fig, ax = plt.subplots()
+                fig, ax = plt.subplots(figsize = (15,10))
 
                 ax.plot(current['Strip'],current['SettlementPrice'], label = current_date, marker = ".", color = 'red')
                 ax.plot(current_1['Strip'],current_1['SettlementPrice'], label = yesterday, marker = ".", color = 'violet')
@@ -498,7 +577,7 @@ class ACDB:
 
 
                 ax.grid()
-                ax.legend()
+                ax.legend(loc = 'upper left',fancybox=True, framealpha=1, shadow=True, borderpad=1)
                 plt.xticks(rotation=45)
                 return plt.show()
                                 
